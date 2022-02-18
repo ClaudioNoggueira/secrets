@@ -1,8 +1,10 @@
 require('dotenv').config();
 const bodyParser = require('body-parser');
 const express = require('express');
-const md5 = require('md5');
 const mongoose = require('mongoose');
+
+const bcrypt = require('bcrypt');
+const saltRounds = 10;
 
 const app = express();
 
@@ -29,39 +31,51 @@ app.get('/home', (request, response) => {
 
 app.get('/login', (request, response) => {
     response.render('login');
-})
+});
 
 app.get('/register', (request, response) => {
     response.render('register');
-})
+});
 
 app.post('/register', (request, response) => {
-    const newUser = new User({
-        email: request.body.username,
-        password: md5(request.body.password)
-    });
+    bcrypt.hash(request.body.password, saltRounds, (error, hash) => {
+        if (!error) {
+            const newUser = new User({
+                email: request.body.username,
+                password: hash
+            });
 
-    newUser.save((error) => {
-        if (error) {
-            console.log(error);
+            newUser.save((error) => {
+                if (error) {
+                    console.log(error);
+                } else {
+                    response.render('secrets');
+                }
+            });
         } else {
-            response.render('secrets');
+            console.log(error);
         }
     });
 });
 
 app.post('/login', (request, response) => {
     const username = request.body.username;
-    const password = md5(request.body.password);
+    const password = request.body.password;
 
     User.findOne({ email: username }, (error, queryResult) => {
         if (error) {
             console.log(error);
         } else {
             if (queryResult) {
-                if (queryResult.password === password) {
-                    response.render('secrets');
-                }
+                bcrypt.compare(password, queryResult.password, (error, bcryptQueryResult) => {
+                    if (!error) {
+                        if (bcryptQueryResult) {
+                            response.render('secrets');
+                        }
+                    } else {
+                        console.log(error);
+                    }
+                });
             }
         }
     });
