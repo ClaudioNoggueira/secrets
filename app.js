@@ -30,7 +30,8 @@ mongoose.connect('mongodb://localhost:27017/userDB');
 const userSchema = new mongoose.Schema({
     email: String,
     password: String,
-    googleId: String
+    googleId: String,
+    secret: String
 });
 
 userSchema.plugin(passportLocalMongoose);
@@ -59,7 +60,6 @@ passport.use(new GoogleStrategy({
 },
     function (accessToken, refreshToken, profile, cb) {
         User.findOrCreate({ googleId: profile.id }, function (err, user) {
-            console.log(profile);
             return cb(err, user);
         });
     }
@@ -93,8 +93,18 @@ app.get('/register', (request, response) => {
 });
 
 app.get('/secrets', (request, response) => {
+    User.find({ 'secret': { $ne: null } }, (error, foundUsers) => {
+        if (!error) {
+            response.render('secrets', { userWithSecrets: foundUsers });
+        } else {
+            console.log(error);
+        }
+    });
+});
+
+app.get('/submit', (request, response) => {
     if (request.isAuthenticated()) {
-        response.render('secrets');
+        response.render('submit');
     } else {
         response.redirect('/login');
     }
@@ -134,6 +144,22 @@ app.post('/login', (request, response) => {
         }
     })
 });
+
+app.post('/submit', (request, response) => {
+    const submittedSecret = request.body.secret;
+    User.findById(request.user.id, (error, foundUser) => {
+        if (!error) {
+            if (foundUser) {
+                foundUser.secret = submittedSecret;
+                foundUser.save(() => {
+                    response.redirect('/secrets');
+                });
+            }
+        } else {
+            console.log(error);
+        }
+    });
+})
 
 app.listen(3000, () => {
     console.log('✔ Server is running on port 3000');
